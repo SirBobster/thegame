@@ -11,43 +11,57 @@ public class ArrowController : MonoBehaviour
     [Header("Ручка")]
     public Transform rushka;
 
-    [Header("Новая палка")]
+    [Header("Prefab новой палки")]
     public GameObject palkaPrefab;
-
 
     [Header("Полёт палки")]
     public float shootSpeed = 10f;
-    public float returnSpeed = 8f;
 
     [Header("Дальность полёта")]
     public float maxShootDistance = 8f;
 
     private int direction = 1;
+
     private Rigidbody2D rb;
 
     private Vector3 startPosition;
-    private bool hitTarget = false;
 
     private bool isShooting = false;
-    private bool isReturning = false;
+    private bool hitTarget = false;
 
-    // Позиция ручки в момент выстрела
+    // Положение ручки в момент выстрела
     private Vector3 rushkaShootPos;
+
+    // Предыдущая позиция палки.
+    // Нужна для проверки очень быстрых попаданий.
+    private Vector2 previousPosition;
+
 
     void Start()
     {
         rb = GetComponent<Rigidbody2D>();
+
         startPosition = transform.position;
+        previousPosition = rb.position;
 
         if (rushka != null)
         {
             rushkaShootPos = rushka.position;
         }
+
+        if (palkaPrefab == null)
+        {
+            Debug.LogError(
+                "У ПАЛКИ " + gameObject.name +
+                " НЕ НАЗНАЧЕН PALKA PREFAB!"
+            );
+        }
     }
+
 
     void Update()
     {
-        if (!isShooting && !isReturning)
+        if (!isShooting)
         {
             if (Keyboard.current != null &&
                 Keyboard.current.spaceKey.wasPressedThisFrame)
@@ -57,60 +71,76 @@ public class ArrowController : MonoBehaviour
         }
     }
 
+
     void FixedUpdate()
     {
-        // Обычное движение влево-вправо
-        if (!isShooting && !isReturning)
+        if (!isShooting)
         {
             MoveLeftRight();
         }
-
-        // Полёт вверх
-        if (isShooting)
+        else
         {
             Shoot();
         }
-
-        // Возвращение вниз
-        if (isReturning)
-        {
-            ReturnToStart();
-        }
     }
 
+
     // =========================================================
-    // ДВИЖЕНИЕ ВЛЕВО-ВПРАВО
+    // ДВИЖЕНИЕ ВЛЕВО / ВПРАВО
     // =========================================================
 
     void MoveLeftRight()
     {
-        Vector2 movement =
-            Vector2.right * direction * moveSpeed * Time.fixedDeltaTime;
+        float moveX =
+            direction *
+            moveSpeed *
+            Time.fixedDeltaTime;
 
-        // Двигаем палку
-        rb.MovePosition(rb.position + movement);
+        Vector2 newPosition = rb.position;
 
-        // Двигаем ручку вместе с палкой
-        if (rushka != null)
+        newPosition.x += moveX;
+
+        // ==========================================
+        // ЖЁСТКИЕ ГРАНИЦЫ
+        // ==========================================
+
+        if (newPosition.x >= rightLimit)
         {
-            rushka.position += new Vector3(movement.x, 0f, 0f);
-        }
-
-        // Границы движения
-        if (rb.position.x >= rightLimit)
-        {
+            newPosition.x = rightLimit;
             direction = -1;
         }
-
-        if (rb.position.x <= leftLimit)
+        else if (newPosition.x <= leftLimit)
         {
+            newPosition.x = leftLimit;
             direction = 1;
+        }
+
+        // ==========================================
+        // ДВИГАЕМ ПАЛКУ
+        // ==========================================
+
+        rb.MovePosition(newPosition);
+
+        // ==========================================
+        // ДВИГАЕМ РУЧКУ РОВНО В ТУ ЖЕ X-КООРДИНАТУ
+        // ==========================================
+
+        if (rushka != null)
+        {
+            Vector3 rushkaPosition = rushka.position;
+
+            rushkaPosition.x = newPosition.x;
+
+            rushka.position = rushkaPosition;
         }
     }
 
+
+
     // =========================================================
-    // НАЖАЛИ SPACE
+    // SPACE
     // =========================================================
+
     void StartShooting()
     {
         isShooting = true;
@@ -120,6 +150,8 @@ public class ArrowController : MonoBehaviour
         {
             rushkaShootPos = rushka.position;
         }
+
+        previousPosition = rb.position;
 
         Debug.Log("СТРЕЛА ВЫПУЩЕНА!");
     }
@@ -131,111 +163,115 @@ public class ArrowController : MonoBehaviour
 
     void Shoot()
     {
-        Vector2 movement =
-            Vector2.up * shootSpeed * Time.fixedDeltaTime;
+        Vector2 oldPosition = rb.position;
 
-        // Палка летит вверх
-        rb.MovePosition(rb.position + movement);
+        float moveY =
+            shootSpeed *
+            Time.fixedDeltaTime;
 
-        // Ручка остаётся там, где была при выстреле
-        if (rushka != null)
-        {
-            rushka.position = rushkaShootPos;
-        }
+        Vector2 newPosition =
+            oldPosition +
+            Vector2.up * moveY;
 
-        float distance =
-            rb.position.y - startPosition.y;
-
-        // Долетели до максимальной дистанции
-        if (distance >= maxShootDistance)
-        {
-            Debug.Log("ПРОМАХ!");
-            StartReturning();
-        }
-    }
-
-    // =========================================================
-    // НАЧАЛО ВОЗВРАЩЕНИЯ
-    // =========================================================
-
-    void StartReturning()
-    {
-        isShooting = false;
-        isReturning = true;
-    }
-
-    // =========================================================
-    // ВОЗВРАЩЕНИЕ ПАЛКИ
-    // =========================================================
-
-    void ReturnToStart()
-    {
-        Vector2 newPosition = Vector2.MoveTowards(
-            rb.position,
-            startPosition,
-            returnSpeed * Time.fixedDeltaTime
-        );
-
-        // Палка возвращается вниз
+        // Двигаем палку
         rb.MovePosition(newPosition);
 
-        // Ручка всё ещё стоит на месте
+        // Ручка остаётся на месте
         if (rushka != null)
         {
             rushka.position = rushkaShootPos;
         }
 
-        // Палка вернулась
-        if (Vector2.Distance(rb.position, startPosition) < 0.05f)
-        {
-            rb.position = startPosition;
+        // =====================================================
+        // ПРОВЕРКА ПОПАДАНИЯ ПРИ ОЧЕНЬ БОЛЬШОЙ СКОРОСТИ
+        // =====================================================
 
-            isReturning = false;
-            isShooting = false;
-
-            // =================================================
-            // ВАЖНО:
-            // После возвращения ставим ручку рядом с палкой
-            // =================================================
-
-            if (rushka != null)
-            {
-                rushka.position = new Vector3(
-                    startPosition.x,
-                    rushkaShootPos.y,
-                    rushkaShootPos.z
-                );
-            }
-
-            Debug.Log("СТРЕЛА ВЕРНУЛАСЬ! РУЧКА СНОВА ДВИГАЕТСЯ ВМЕСТЕ.");
-        }
-    }
-
-    // =========================================================
-    // ПОПАДАНИЕ В ЦЕЛЬ
-    // =========================================================
-
-    private void OnTriggerEnter2D(Collider2D other)
-    {
-        if (!isShooting)
-            return;
+        CheckFastTargetHit(oldPosition, newPosition);
 
         if (hitTarget)
             return;
 
-        if (!other.CompareTag("Target"))
+        // =====================================================
+        // ПРОВЕРКА ДАЛЬНОСТИ
+        // =====================================================
+
+        float distance =
+            newPosition.y - startPosition.y;
+
+        if (distance >= maxShootDistance)
+        {
+            Debug.Log("ПРОМАХ!");
+
+            SpawnNewPalka();
+        }
+
+        previousPosition = newPosition;
+    }
+
+
+    // =========================================================
+    // ПРОВЕРКА TARGET ДАЖЕ ПРИ ОЧЕНЬ БОЛЬШОЙ СКОРОСТИ
+    // =========================================================
+
+    void CheckFastTargetHit(Vector2 oldPosition, Vector2 newPosition)
+    {
+        Vector2 direction = newPosition - oldPosition;
+        float distance = direction.magnitude;
+
+        if (distance <= 0f)
             return;
 
-        // Блокируем повторное срабатывание
+        // Проверяем все коллайдеры на пути палки
+        RaycastHit2D[] hits = Physics2D.RaycastAll(
+            oldPosition,
+            direction.normalized,
+            distance
+        );
+
+        foreach (RaycastHit2D hit in hits)
+        {
+            if (hit.collider == null)
+                continue;
+
+            if (!hit.collider.CompareTag("Target"))
+                continue;
+
+            HitTarget(hit.collider);
+            return;
+        }
+    }
+
+
+
+    // =========================================================
+    // ПОПАДАНИЕ
+    // =========================================================
+
+    void HitTarget(Collider2D target)
+    {
+        if (hitTarget)
+            return;
+
+        if (!isShooting)
+            return;
+
         hitTarget = true;
         isShooting = false;
 
         Debug.Log("ПОПАДАНИЕ!");
 
-        // Уничтожаем Target
-        Destroy(other.gameObject);
+        Destroy(target.gameObject);
 
-        // Проверяем, есть ли Prefab и Rushka
+        SpawnNewPalka();
+    }
+
+
+    // =========================================================
+    // СОЗДАНИЕ НОВОЙ ПАЛКИ
+    // =========================================================
+
+    void SpawnNewPalka()
+    {
         if (palkaPrefab == null)
         {
             Debug.LogError("PALKA PREFAB НЕ НАЗНАЧЕН!");
@@ -248,33 +284,50 @@ public class ArrowController : MonoBehaviour
             return;
         }
 
-        // Создаём новую палку
+        // Новая палка появляется на ручке
         GameObject newPalka = Instantiate(
             palkaPrefab,
             rushka.position,
             transform.rotation
         );
 
-        Debug.Log("НОВАЯ ПАЛКА СОЗДАНА: " + newPalka.name);
+        Debug.Log(
+            "НОВАЯ ПАЛКА СОЗДАНА: " +
+            newPalka.name
+        );
 
-        // Получаем контроллер новой палки
         ArrowController newController =
             newPalka.GetComponent<ArrowController>();
 
         if (newController == null)
         {
-            Debug.LogError("У НОВОЙ PALKA НЕТ ARROW CONTROLLER!");
+            Debug.LogError(
+                "У НОВОЙ PALKA НЕТ ARROW CONTROLLER!"
+            );
+
+            Destroy(newPalka);
             return;
         }
 
-        // Передаём ручку новой палке
+        // Передаём ручку
         newController.SetRushka(rushka);
+
+        // Передаём prefab дальше
+        newController.palkaPrefab = palkaPrefab;
 
         // Удаляем старую палку
         Destroy(gameObject);
+
+        Debug.Log(
+            "СТАРАЯ ПАЛКА УДАЛЕНА, " +
+            "НОВАЯ ПАЛКА ГОТОВА!"
+        );
     }
 
 
+    // =========================================================
+    // ПЕРЕДАЧА РУЧКИ НОВОЙ ПАЛКЕ
+    // =========================================================
 
     public void SetRushka(Transform newRushka)
     {
@@ -283,15 +336,20 @@ public class ArrowController : MonoBehaviour
         startPosition = transform.position;
 
         isShooting = false;
-        isReturning = false;
         hitTarget = false;
 
         if (rushka != null)
         {
             rushkaShootPos = rushka.position;
+
+            // Сразу синхронизируем X
+            Vector3 newPosition = transform.position;
+
+            newPosition.x = rushka.position.x;
+
+            transform.position = newPosition;
         }
+
+        previousPosition = transform.position;
     }
-
-
-
 }

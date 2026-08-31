@@ -180,11 +180,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 794555a4017d17f4eac33e9c1f21edd4, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ArrowController
-  moveSpeed: 2000
-  leftLimit: -2500
-  rightLimit: 2500
-  rushka: {fileID: 0}
+  moveSpeed: 8000
+  leftLimit: -2600
+  rightLimit: 2600
+  rushka: {fileID: 1165362113518447522, guid: b33b26be31bade748a48f632265c856e, type: 3}
   palkaPrefab: {fileID: 0}
   shootSpeed: 1500
-  returnSpeed: 1500
-  maxShootDistance: 1500
+  maxShootDistance: 2000
