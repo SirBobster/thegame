@@ -224,9 +224,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ad3e1a676576f584ebd15623c5b648ef, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SurfPlayerscr
-  speedforward: 0.001
-  speedleft: -0.001
-  speedright: 0.001
+  speed: 0.01
 --- !u!1 &1599581100
 GameObject:
   m_ObjectHideFlags: 0
@@ -239,7 +237,6 @@ GameObject:
   - component: {fileID: 1599581102}
   - component: {fileID: 1599581101}
   - component: {fileID: 1599581104}
-  - component: {fileID: 1599581105}
   m_Layer: 0
   m_Name: Main Camera
   m_TagString: MainCamera
@@ -365,18 +362,6 @@ MonoBehaviour:
     m_VarianceClampScale: 0.9
     m_ContrastAdaptiveSharpening: 0
   m_Version: 2
---- !u!114 &1599581105
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1599581100}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 285e82738e105e448886226f6fd49e9e, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::surfcamera
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
