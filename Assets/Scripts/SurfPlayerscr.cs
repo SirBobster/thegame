@@ -1,4 +1,3 @@
-using Unity.VisualScripting;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -9,15 +8,17 @@ public float speedleft = -0.1f;
 public float speedright = 0.1f;
 bool SwitchDirection;
 bool GameStarted;
-bool healthpoint = true;
-    // Start is called once before the first execution of Update after the MonoBehaviour is created
+public bool GameEnded;
     void Start()
     {
         
     }
-    // Update is called once per frame
     void Update()
     {
+        if (GameEnded)
+        {
+            return;
+        }
         if (Keyboard.current.dKey.wasPressedThisFrame)
         {
             GameStarted = true;
@@ -38,15 +39,10 @@ bool healthpoint = true;
             {
                 transform.position += new Vector3(speedright, speedforward, 0f);
             }
-        if (!healthpoint)
-            {
-                Debug.Log("health down");
-                healthpoint = true;
-            }
         }
     }
     private void OnTriggerEnter2D(Collider2D collision)
     {
-        healthpoint = false;
+        GameEnded = true;
     }
 }

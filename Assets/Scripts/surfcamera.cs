@@ -5,15 +5,17 @@ using UnityEngine.InputSystem;
 public class surfcamera : MonoBehaviour
 {
 bool GameStarted;
-    // Start is called once before the first execution of Update after the MonoBehaviour is created
+public SurfPlayerscr surfPlayerscr;
     void Start()
     {
         
     }
-
-    // Update is called once per frame
     void Update()
     {
+        if (surfPlayerscr.GameEnded)
+        {
+            return;
+        }
         if (Keyboard.current.aKey.wasPressedThisFrame || Keyboard.current.dKey.wasPressedThisFrame) {
         GameStarted = true;
         }
