@@ -3,57 +3,63 @@ using UnityEngine.InputSystem;
 
 public class ArrowController : MonoBehaviour
 {
-    [Header("Движение палки")]
+    [Header("Движение ArrowRoot")]
     public float moveSpeed = 6f;
     public float leftLimit = -5f;
     public float rightLimit = 5f;
 
-    [Header("Ручка")]
+    [Header("Дочерние объекты")]
+    public Transform palka;
     public Transform rushka;
+    private Vector3 palkaLocalPosition;
+    private Quaternion palkaLocalRotation;
 
-    [Header("Prefab новой палки")]
+    [Header("Prefab летающей палки")]
     public GameObject palkaPrefab;
-
-    [Header("Полёт палки")]
-    public float shootSpeed = 10f;
-
-    [Header("Дальность полёта")]
-    public float maxShootDistance = 8f;
-
-    private int direction = 1;
 
     private Rigidbody2D rb;
 
-    private Vector3 startPosition;
+    private int direction = 1;
 
-    private bool isShooting = false;
-    private bool hitTarget = false;
-
-    // Положение ручки в момент выстрела
-    private Vector3 rushkaShootPos;
-
-    // Предыдущая позиция палки.
-    // Нужна для проверки очень быстрых попаданий.
-    private Vector2 previousPosition;
+    private bool isReady = true;
 
 
     void Start()
     {
         rb = GetComponent<Rigidbody2D>();
 
-        startPosition = transform.position;
-        previousPosition = rb.position;
-
-        if (rushka != null)
+        if (palka != null)
         {
-            rushkaShootPos = rushka.position;
+            palkaLocalPosition = palka.localPosition;
+            palkaLocalRotation = palka.localRotation;
+        }
+
+
+        if (rb == null)
+        {
+            Debug.LogError(
+                "На ArrowRoot нет Rigidbody2D!"
+            );
+        }
+
+        if (palka == null)
+        {
+            Debug.LogError(
+                "В ArrowController не назначена Palka!"
+            );
+        }
+
+        if (rushka == null)
+        {
+            Debug.LogError(
+                "В ArrowController не назначена Rushka!"
+            );
         }
 
         if (palkaPrefab == null)
         {
             Debug.LogError(
-                "У ПАЛКИ " + gameObject.name +
-                " НЕ НАЗНАЧЕН PALKA PREFAB!"
+                "В ArrowController не назначен Palka Prefab!"
             );
         }
     }
@@ -61,48 +67,39 @@ public class ArrowController : MonoBehaviour
 
     void Update()
     {
-        if (!isShooting)
+        if (!isReady)
+            return;
+
+        if (Keyboard.current != null &&
+            Keyboard.current.spaceKey.wasPressedThisFrame)
         {
-            if (Keyboard.current != null &&
-                Keyboard.current.spaceKey.wasPressedThisFrame)
-            {
-                StartShooting();
-            }
+            StartShooting();
         }
     }
 
 
     void FixedUpdate()
     {
-        if (!isShooting)
-        {
-            MoveLeftRight();
-        }
-        else
-        {
-            Shoot();
-        }
+        if (!isReady)
+            return;
+
+        MoveLeftRight();
     }
 
 
     // =========================================================
-    // ДВИЖЕНИЕ ВЛЕВО / ВПРАВО
+    // ДВИЖЕНИЕ ARROW ROOT
     // =========================================================
 
     void MoveLeftRight()
     {
-        float moveX =
+        Vector2 newPosition = rb.position;
+
+        newPosition.x +=
             direction *
             moveSpeed *
             Time.fixedDeltaTime;
 
-        Vector2 newPosition = rb.position;
-
-        newPosition.x += moveX;
-
-        // ==========================================
-        // ЖЁСТКИЕ ГРАНИЦЫ
-        // ==========================================
 
         if (newPosition.x >= rightLimit)
         {
@@ -115,26 +112,9 @@ public class ArrowController : MonoBehaviour
             direction = 1;
         }
 
-        // ==========================================
-        // ДВИГАЕМ ПАЛКУ
-        // ==========================================
 
         rb.MovePosition(newPosition);
-
-        // ==========================================
-        // ДВИГАЕМ РУЧКУ РОВНО В ТУ ЖЕ X-КООРДИНАТУ
-        // ==========================================
-
-        if (rushka != null)
-        {
-            Vector3 rushkaPosition = rushka.position;
-
-            rushkaPosition.x = newPosition.x;
-
-            rushka.position = rushkaPosition;
-        }
     }
-
 
 
     // =========================================================
@@ -143,213 +123,75 @@ public class ArrowController : MonoBehaviour
 
     void StartShooting()
     {
-        isShooting = true;
-        hitTarget = false;
+        isReady = false;
 
-        if (rushka != null)
+        Debug.Log("SPACE → ПАЛКА ВЫПУЩЕНА!");
+
+        if (palka == null)
         {
-            rushkaShootPos = rushka.position;
+            Debug.LogError("Palka отсутствует!");
+            return;
         }
 
-        previousPosition = rb.position;
-
-        Debug.Log("СТРЕЛА ВЫПУЩЕНА!");
-    }
-
-
-    // =========================================================
-    // ПОЛЁТ ВВЕРХ
-    // =========================================================
-
-    void Shoot()
-    {
-        Vector2 oldPosition = rb.position;
-
-        float moveY =
-            shootSpeed *
-            Time.fixedDeltaTime;
-
-        Vector2 newPosition =
-            oldPosition +
-            Vector2.up * moveY;
-
-        // Двигаем палку
-        rb.MovePosition(newPosition);
-
-        // Ручка остаётся на месте
-        if (rushka != null)
-        {
-            rushka.position = rushkaShootPos;
-        }
-
-        // =====================================================
-        // ПРОВЕРКА ПОПАДАНИЯ ПРИ ОЧЕНЬ БОЛЬШОЙ СКОРОСТИ
-        // =====================================================
-
-        CheckFastTargetHit(oldPosition, newPosition);
-
-        if (hitTarget)
-            return;
-
-        // =====================================================
-        // ПРОВЕРКА ДАЛЬНОСТИ
-        // =====================================================
-
-        float distance =
-            newPosition.y - startPosition.y;
-
-        if (distance >= maxShootDistance)
-        {
-            Debug.Log("ПРОМАХ!");
-
-            SpawnNewPalka();
-        }
-
-        previousPosition = newPosition;
-    }
-
-
-    // =========================================================
-    // ПРОВЕРКА TARGET ДАЖЕ ПРИ ОЧЕНЬ БОЛЬШОЙ СКОРОСТИ
-    // =========================================================
-
-    void CheckFastTargetHit(Vector2 oldPosition, Vector2 newPosition)
-    {
-        Vector2 direction = newPosition - oldPosition;
-        float distance = direction.magnitude;
-
-        if (distance <= 0f)
-            return;
-
-        // Проверяем все коллайдеры на пути палки
-        RaycastHit2D[] hits = Physics2D.RaycastAll(
-            oldPosition,
-            direction.normalized,
-            distance
-        );
-
-        foreach (RaycastHit2D hit in hits)
-        {
-            if (hit.collider == null)
-                continue;
-
-            if (!hit.collider.CompareTag("Target"))
-                continue;
-
-            HitTarget(hit.collider);
-            return;
-        }
-    }
-
-
-
-    // =========================================================
-    // ПОПАДАНИЕ
-    // =========================================================
-
-    void HitTarget(Collider2D target)
-    {
-        if (hitTarget)
-            return;
-
-        if (!isShooting)
-            return;
-
-        hitTarget = true;
-        isShooting = false;
-
-        Debug.Log("ПОПАДАНИЕ!");
-
-        Destroy(target.gameObject);
-
-        SpawnNewPalka();
-    }
-
-
-    // =========================================================
-    // СОЗДАНИЕ НОВОЙ ПАЛКИ
-    // =========================================================
-
-    void SpawnNewPalka()
-    {
         if (palkaPrefab == null)
         {
-            Debug.LogError("PALKA PREFAB НЕ НАЗНАЧЕН!");
+            Debug.LogError("Palka Prefab не назначен!");
             return;
         }
 
-        if (rushka == null)
-        {
-            Debug.LogError("RUSHKA НЕ НАЗНАЧЕНА!");
-            return;
-        }
 
-        // Новая палка появляется на ручке
-        GameObject newPalka = Instantiate(
+        // Запоминаем позицию палки
+        Vector3 spawnPosition = palka.position;
+
+        Quaternion spawnRotation = palka.rotation;
+
+
+        // Создаём самостоятельную палку
+        GameObject flyingPalka = Instantiate(
             palkaPrefab,
-            rushka.position,
-            transform.rotation
+            spawnPosition,
+            spawnRotation
         );
 
-        Debug.Log(
-            "НОВАЯ ПАЛКА СОЗДАНА: " +
-            newPalka.name
-        );
 
-        ArrowController newController =
-            newPalka.GetComponent<ArrowController>();
+        // Передаём ручку новой летающей палке
+        FlyingPalka flyingScript =
+            flyingPalka.GetComponent<FlyingPalka>();
 
-        if (newController == null)
+
+        if (flyingScript != null)
         {
-            Debug.LogError(
-                "У НОВОЙ PALKA НЕТ ARROW CONTROLLER!"
+            flyingScript.SetRushka(
+                rushka,
+                palka,
+                palkaLocalPosition,
+                palkaLocalRotation
             );
 
-            Destroy(newPalka);
-            return;
         }
 
-        // Передаём ручку
-        newController.SetRushka(rushka);
+        else
+        {
+            Debug.LogError(
+                "На Palka Prefab отсутствует FlyingPalka!"
+            );
+        }
 
-        // Передаём prefab дальше
-        newController.palkaPrefab = palkaPrefab;
 
-        // Удаляем старую палку
-        Destroy(gameObject);
+        // Прячем палку внутри ArrowRoot
+        palka.gameObject.SetActive(false);
+
 
         Debug.Log(
-            "СТАРАЯ ПАЛКА УДАЛЕНА, " +
-            "НОВАЯ ПАЛКА ГОТОВА!"
+            "Старая Palka спрятана. " +
+            "Новая Palka летит."
         );
     }
-
-
-    // =========================================================
-    // ПЕРЕДАЧА РУЧКИ НОВОЙ ПАЛКЕ
-    // =========================================================
-
-    public void SetRushka(Transform newRushka)
+    public void ReadyForNextShot()
     {
-        rushka = newRushka;
+        isReady = true;
 
-        startPosition = transform.position;
-
-        isShooting = false;
-        hitTarget = false;
-
-        if (rushka != null)
-        {
-            rushkaShootPos = rushka.position;
-
-            // Сразу синхронизируем X
-            Vector3 newPosition = transform.position;
-
-            newPosition.x = rushka.position.x;
-
-            transform.position = newPosition;
-        }
-
-        previousPosition = transform.position;
+        Debug.Log("НОВАЯ ПАЛКА ГОТОВА! ДВИЖЕНИЕ ВОЗОБНОВЛЕНО!");
     }
+
 }
