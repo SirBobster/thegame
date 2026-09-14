@@ -42,6 +42,12 @@ TagManager:
   - name: Default
     uniqueID: 0
     locked: 0
+  - name: HeavyDebris
+    uniqueID: 1284206151
+    locked: 0
+  - name: HiddenItems
+    uniqueID: 4170158717
+    locked: 0
   m_RenderingLayers:
   - Default
   m_MigratedRenderPipelines: []
